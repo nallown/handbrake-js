@@ -1,10 +1,10 @@
-var hbjs = require('..')
-var path = require('path')
+const hbjs = require('..')
+const path = require('path')
 
-var options = {
+const options = {
   input: path.resolve(__dirname, '../test/video/demo.mkv'),
   output: 'output.mp4',
-  preset: 'Normal'
+  preset: 'Very Fast 480p30'
 }
 
 /*

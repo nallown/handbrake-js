@@ -1,12 +1,14 @@
 [![view on npm](http://img.shields.io/npm/v/handbrake-js.svg)](https://www.npmjs.org/package/handbrake-js)
 [![npm module downloads](http://img.shields.io/npm/dt/handbrake-js.svg)](https://www.npmjs.org/package/handbrake-js)
 [![Build Status](https://travis-ci.org/75lb/handbrake-js.svg?branch=master)](https://travis-ci.org/75lb/handbrake-js)
-[![Dependency Status](https://david-dm.org/75lb/handbrake-js.svg)](https://david-dm.org/75lb/handbrake-js)
+[![Dependency Status](https://badgen.net/david/dep/75lb/handbrake-js)](https://david-dm.org/75lb/handbrake-js)
 [![js-standard-style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg)](https://github.com/feross/standard)
 [![Join the chat at https://gitter.im/75lb/handbrake-js](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/75lb/handbrake-js?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+***Upgraders, please read the [release notes](https://github.com/75lb/handbrake-js/releases).***
+
 # handbrake-js
-Handbrake-js is [Handbrake](http://handbrake.fr) (v0.10.5) for [node.js](http://nodejs.org), funnily enough. It aspires to provide a lean and stable foundation for building video transcoding software in node.js.
+Handbrake-js is [Handbrake](http://handbrake.fr) ([v1.3.0](https://github.com/HandBrake/HandBrake/releases/tag/1.3.0)) for [node.js](http://nodejs.org). It aspires to provide a lean and stable foundation for building video transcoding software in node.js.
 
 HandBrake is a tool for converting video from nearly any format to a selection of modern, widely supported codecs. It can process most common multimedia files and any DVD or BluRay sources that do not contain any copy protection.
 
@@ -44,19 +46,19 @@ $ npm install handbrake-js --save
 Now you can begin encoding from your app.
 
 ```js
-var hbjs = require('handbrake-js');
+const hbjs = require('handbrake-js')
 
 hbjs.spawn({ input: 'something.avi', output: 'something.m4v' })
-  .on('error', function(err){
+  .on('error', err => {
     // invalid user input, no video found etc
   })
-  .on('progress', function(progress){
+  .on('progress', progress => {
     console.log(
       'Percent complete: %s, ETA: %s',
       progress.percentComplete,
       progress.eta
-    );
-  });
+    )
+  })
 ```
 ### As a command-line app
 From any directory run the following:
@@ -77,13 +79,14 @@ Handbrake for node.js.
 
 **Example**  
 ```js
-var hbjs = require('handbrake-js')
+const hbjs = require('handbrake-js')
 ```
 
 * [handbrake-js](#module_handbrake-js)
     * _static_
         * [.spawn([options])](#module_handbrake-js.spawn) ⇒ [<code>Handbrake</code>](#module_handbrake-js..Handbrake)
         * [.exec(options, [onComplete])](#module_handbrake-js.exec)
+        * [.run(options)](#module_handbrake-js.run) ⇒ <code>Promise</code>
     * _inner_
         * [~Handbrake](#module_handbrake-js..Handbrake) ⇐ [<code>EventEmitter</code>](http://nodejs.org/api/events.html)
             * [.output](#module_handbrake-js..Handbrake+output) : <code>string</code>
@@ -112,9 +115,9 @@ Spawns a HandbrakeCLI process with the supplied [options](https://handbrake.fr/d
 
 **Example**  
 ```js
-var hbjs = require('handbrake-js')
+const hbjs = require('handbrake-js')
 
-var options = {
+const options = {
   input: 'something.avi',
   output: 'something.mp4',
   preset: 'Normal',
@@ -138,12 +141,35 @@ Runs HandbrakeCLI with the supplied [options](https://handbrake.fr/docs/en/lates
 
 **Example**  
 ```js
-var hbjs = require('handbrake-js')
+const hbjs = require('handbrake-js')
 
 hbjs.exec({ preset-list: true }, function(err, stdout, stderr){
   if (err) throw err
   console.log(stdout)
 })
+```
+<a name="module_handbrake-js.run"></a>
+
+### hbjs.run(options) ⇒ <code>Promise</code>
+Identical to `hbjs.exec` except it returns a promise, rather than invoke a callback. Use this when you don't need the progress events reported by `hbjs.spawn`. Fulfils with an object containing the output in two properties: `stdout` and `stderr`.
+
+**Kind**: static method of [<code>handbrake-js</code>](#module_handbrake-js)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| options | <code>Object</code> | [Options](https://handbrake.fr/docs/en/latest/cli/cli-guide.html#options) to pass directly to HandbrakeCLI |
+
+**Example**  
+```js
+const hbjs = require('handbrake-js')
+
+async function start () {
+  const result = await hbjs.run({ version: true })
+  console.log(result.stdout)
+  // prints 'HandBrake 1.3.0'
+}
+
+start().catch(console.error)
 ```
 <a name="module_handbrake-js..Handbrake"></a>
 
@@ -190,10 +216,11 @@ All operational errors are emitted via the [error](#module_handbrake-js..Handbra
 
 | Name | Default | Description |
 | --- | --- | --- |
-| VALIDATION | <code>ValidationError</code> | Thrown if you accidentally set identical input and output paths (which would clobber the input file), forget to specifiy an output path and other validation errors |
-| INVALID_INPUT | <code>InvalidInput</code> | Thrown when the input file specified does not appear to be a video file |
-| OTHER | <code>Other</code> | Thrown if Handbrake crashes |
-| NOT_FOUND | <code>HandbrakeCLINotFound</code> | Thrown if the installed HandbrakeCLI binary has gone missing.. |
+| VALIDATION | <code>ValidationError</code> | Thrown if you accidentally set identical input and output paths (which would clobber the input file), forget to specifiy an output path and other validation errors. |
+| INVALID_INPUT | <code>InvalidInput</code> | Thrown when the input file specified does not appear to be a video file. |
+| INVALID_PRESET | <code>InvalidPreset</code> | Thrown when an invalid preset is specified. |
+| OTHER | <code>Other</code> | Thrown if Handbrake crashes. |
+| NOT_FOUND | <code>HandbrakeCLINotFound</code> | Thrown if the installed HandbrakeCLI binary has gone missing. |
 
 <a name="module_handbrake-js..Handbrake+cancel"></a>
 
@@ -273,4 +300,8 @@ If `.cancel()` was called, this event is emitted once the underlying HandbrakeCL
 
 * * *
 
-&copy; 2013-17 Lloyd Brookes &lt;75pound@gmail.com&gt;. Documented by [jsdoc-to-markdown](https://github.com/75lb/jsdoc-to-markdown).
+&copy; 2013-20 Lloyd Brookes &lt;75pound@gmail.com&gt;.
+
+Tested by [test-runner](https://github.com/test-runner-js/test-runner). Documented by [jsdoc-to-markdown](https://github.com/jsdoc2md/jsdoc-to-markdown).
+
+Handbrake ([Authors](https://github.com/HandBrake/HandBrake/blob/master/AUTHORS.markdown)) is licensed by [GNU General Public License Version 2](https://github.com/HandBrake/HandBrake/blob/master/LICENSE).

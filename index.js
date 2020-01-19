@@ -1,41 +1,12 @@
-'use strict'
-var Handbrake = require('./Handbrake')
-var util = require('util')
-var cp = require('child_process')
-var toSpawnArgs = require('object-to-spawn-args')
-var config = require('./config')
-var cliOptions = require('./cli-options')
-var Usage = require('usage-stats')
-var os = require('os')
-
-var usage = exports._usage = new Usage('UA-70853320-7', {
-  an: 'handbrake-js',
-  av: require('../package').version
-})
-usage.defaults
-  .set('cd1', process.version)
-  .set('cd2', os.type())
-  .set('cd3', os.release())
-  .set('cd4', 'api')
-
 /**
  * Handbrake for node.js.
  * @module handbrake-js
  * @typicalname hbjs
  * @example
  * ```js
- * var hbjs = require('handbrake-js')
+ * const hbjs = require('handbrake-js')
  * ```
  */
-exports.spawn = spawn
-exports.exec = exec
-
-/**
- * [Command-line-args](https://github.com/75lb/command-line-args) option definitions, useful when building a  * CLI.
- * @type {array}
- * @ignore
- */
-exports.cliOptions = cliOptions
 
 /**
  * Spawns a HandbrakeCLI process with the supplied [options](https://handbrake.fr/docs/en/latest/cli/cli-guide.html#options), returning an instance of `Handbrake` on which you can listen for events.
@@ -45,9 +16,9 @@ exports.cliOptions = cliOptions
  * @alias module:handbrake-js.spawn
  * @example
  * ```js
- * var hbjs = require('handbrake-js')
+ * const hbjs = require('handbrake-js')
  *
- * var options = {
+ * const options = {
  *   input: 'something.avi',
  *   output: 'something.mp4',
  *   preset: 'Normal',
@@ -59,8 +30,8 @@ exports.cliOptions = cliOptions
  * ```
  */
 function spawn (options, mocks) {
-  var handbrake = new Handbrake(mocks)
-  screenView('spawn', options)
+  const Handbrake = require('./lib/Handbrake')
+  const handbrake = new Handbrake(mocks)
 
   /* defer so the caller can attach event listers on the returned Handbrake instance first */
   process.nextTick(function () {
@@ -68,7 +39,7 @@ function spawn (options, mocks) {
       handbrake.options = options
       handbrake._run()
     } catch (error) {
-      var err = new Error()
+      const err = new Error()
       err.message = error.message
       err.name = 'InvalidOption'
       handbrake._emitError(err)
@@ -86,7 +57,7 @@ function spawn (options, mocks) {
  *
  * @example
  * ```js
- * var hbjs = require('handbrake-js')
+ * const hbjs = require('handbrake-js')
  *
  * hbjs.exec({ preset-list: true }, function(err, stdout, stderr){
  *   if (err) throw err
@@ -96,8 +67,11 @@ function spawn (options, mocks) {
  * @alias module:handbrake-js.exec
  */
 function exec (options, done) {
-  screenView('exec', options)
-  var cmd = util.format(
+  const util = require('util')
+  const cp = require('child_process')
+  const toSpawnArgs = require('object-to-spawn-args')
+  const config = require('./lib/config')
+  const cmd = util.format(
     '"%s" %s',
     config.HandbrakeCLIPath,
     toSpawnArgs(options, { quote: true }).join(' ')
@@ -105,18 +79,37 @@ function exec (options, done) {
   cp.exec(cmd, done)
 }
 
-function screenView (name, options) {
-  if (options['no-usage-stats']) {
-    /* skip recording stats.. finished with the option, remove it. */
-    delete options['no-usage-stats']
-  } else {
-    usage.screenView(name)
-    for (var prop in options) {
-      if ([ 'input', 'output' ].indexOf(prop) === -1) {
-        usage.event('option', prop, { hitParams: { cd: name } })
+/**
+ * Identical to `hbjs.exec` except it returns a promise, rather than invoke a callback. Use this when you don't need the progress events reported by `hbjs.spawn`. Fulfils with an object containing the output in two properties: `stdout` and `stderr`.
+ * @param options {Object} - [Options](https://handbrake.fr/docs/en/latest/cli/cli-guide.html#options) to pass directly to HandbrakeCLI
+ * @returns {Promise}
+ * @example
+ * ```js
+ * const hbjs = require('handbrake-js')
+ *
+ * async function start () {
+ *   const result = await hbjs.run({ version: true })
+ *   console.log(result.stdout)
+ *   // prints 'HandBrake 1.3.0'
+ * }
+ *
+ * start().catch(console.error)
+ * ```
+ * @alias module:handbrake-js.run
+ */
+async function run (options) {
+  return new Promise((resolve, reject) => {
+    exec(options, function (err, stdout, stderr) {
+      if (err) {
+        reject(err)
+      } else {
+        resolve({ stdout, stderr })
       }
-    }
-    usage.send({ timeout: 3000 })
-      .catch(function () { /* disregard errors */ })
-  }
+    })
+  })
 }
+
+exports.spawn = spawn
+exports.exec = exec
+exports.run = run
+exports.cliOptions = require('./lib/cli-options')

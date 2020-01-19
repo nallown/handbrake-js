@@ -1,64 +1,90 @@
-'use strict'
-var TestRunner = require('test-runner')
-var cp = require('child_process')
-var fs = require('fs')
-var hbjs = require('../lib/handbrake-js')
-var a = require('core-assert')
-var Counter = require('./lib/counter')
+const Tom = require('test-runner').Tom
+const cp = require('child_process')
+const fs = require('fs')
+const hbjs = require('../')
+const a = require('assert')
+const sleep = require('sleep-anywhere')
+const path = require('path')
 
-var runner = new TestRunner()
-hbjs._usage.disable()
+const tom = module.exports = new Tom()
 
-runner.test('cli: --preset-list', function () {
-  var counter = Counter.create(1)
-  cp.exec('node bin/cli.js --no-usage-stats --preset-list', function (err, stdout, stderr) {
-    if (err) {
-      counter.fail(stderr)
-    } else {
-      counter.pass()
-    }
+const cliPath = path.resolve(__dirname, '../bin/cli.js')
+
+tom.test('cli: --preset-list', async function () {
+  return new Promise((resolve, reject) => {
+    cp.exec(`node ${cliPath} --preset-list`, function (err, stdout, stderr) {
+      if (err) {
+        reject(err)
+      } else {
+        a.ok(/Legacy/.test(stdout))
+        resolve()
+      }
+    })
   })
-  return counter.promise
 })
 
-runner.test('cli: simple encode', function () {
-  var counter = Counter.create(1)
+tom.test('cli: simple encode', async function () {
   try {
     fs.mkdirSync('tmp')
   } catch (err) {
     // dir already exists
   }
-  cp.exec('node bin/cli.js --no-usage-stats -i test/video/demo.mkv -o tmp/test.mp4 --rotate 5 -v', function (err, stdout, stderr) {
-    if (err) {
-      counter.fail(stderr)
-    } else {
-      a.ok(/Rotate \(rotate & flip image axes\) \(5\)/.test(stdout))
-      counter.pass()
-    }
+  return new Promise((resolve, reject) => {
+    const inputPath = path.resolve(__dirname, 'video/demo.mkv')
+    const outputPath = path.resolve(__dirname, '../tmp/test.mp4')
+    cp.exec(`node ${cliPath} -i ${inputPath} -o ${outputPath} --rotate angle=90:hflip=1 -v`, (err, stdout, stderr) => {
+      if (err) {
+        reject(err)
+      } else {
+        /* Handbrake v1.3.0 || Handbrake v1.1.2 (installed on travis) */
+        if (/Rotate \(angle=90:hflip=1\)/.test(stdout) || /dir=clock_flip/.test(stdout)) {
+          resolve()
+        } else {
+          reject(new Error('Incorrect stdout'))
+        }
+      }
+    })
   })
-  return counter.promise
 })
 
-runner.test('exec: --preset-list', function () {
-  var counter = Counter.create(1)
-  hbjs.exec({ 'preset-list': true }, function (err, stdout, stderr) {
-    if (err) {
-      counter.fail(stderr)
-    } else if (/Devices/.test(stdout)) {
-      counter.pass()
-    }
+tom.test('exec: --preset-list', async function () {
+  return new Promise((resolve, reject) => {
+    hbjs.exec({ 'preset-list': true }, function (err, stdout, stderr) {
+      if (err) {
+        reject(err)
+      } else {
+        a.ok(/Devices/.test(stderr))
+        resolve()
+      }
+    })
   })
-  return counter.promise
 })
 
-runner.test('.cancel()', function () {
-  var counter = Counter.create(1)
-  var handbrake = hbjs.spawn({ input: 'test/video/demo.mkv', output: 'tmp/cancelled.mp4' })
-  handbrake.on('begin', function () {
-    handbrake.cancel()
+tom.test('run: --version', async function () {
+  const events = []
+  const result = await hbjs.run({ version: true })
+  this.data = result
+})
+
+tom.test('.cancel(): must fire cancelled event within 5s', async function () {
+  return new Promise((resolve, reject) => {
+    const events = []
+    const handbrake = hbjs.spawn({
+      input: path.resolve(__dirname, 'video/demo.mkv'),
+      output: path.resolve(__dirname, '../tmp/cancelled.mp4' )
+    })
+    handbrake.on('begin', function () {
+      handbrake.cancel()
+    })
+    handbrake.on('cancelled', function () {
+      resolve()
+    })
   })
-  handbrake.on('cancelled', function () {
-    counter.pass()
-  })
-  return counter.promise
+}, { timeout: 5000 })
+
+tom.test('spawn: correct return type', async function () {
+  const mockCp = require('./mock/child_process')
+  const Handbrake = require('../lib/Handbrake')
+  const handbrake = hbjs.spawn({ input: 'in', output: 'out' }, { cp: mockCp })
+  a.ok(handbrake instanceof Handbrake)
 })
